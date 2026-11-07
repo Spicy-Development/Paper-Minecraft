@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#18231d">
+  <title>Paper Minecraft</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #edf2d7;
+      --muted: #9da98b;
+      --paper: #202c24;
+      --paper-deep: #18221c;
+      --line: #405143;
+      --lime: #d7ed83;
+      --coral: #e58466;
+      --ui-font: "Trebuchet MS", "Segoe UI", sans-serif;
+      --pixel-font: "Courier New", monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body {
+      color: var(--ink);
+      background-color: #18231d;
+      background-image: radial-gradient(#344638 0.8px, transparent 0.8px);
+      background-size: 15px 15px;
+      font-family: var(--ui-font);
+    }
+    button { color: inherit; font: inherit; }
+    .game-shell {
+      width: min(1180px, 100%);
+      height: 100%;
+      margin: 0 auto;
+      display: grid;
+      grid-template-rows: 64px minmax(0, 1fr) 92px;
+      padding: 0 24px;
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--line);
+      gap: 16px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      color: #172019;
+      background: var(--lime);
+      font: bold 16px var(--pixel-font);
+      box-shadow: 3px 3px 0 #73864c;
+    }
+    .brand-title { font: bold 14px var(--pixel-font); letter-spacing: 0; white-space: nowrap; }
+    .brand-subtitle { margin-top: 3px; color: var(--muted); font-size: 10px; text-transform: uppercase; }
+    .top-actions { display: flex; align-items: center; gap: 8px; }
+    .icon-button, .text-button {
+      min-height: 34px;
+      border: 1px solid var(--line);
+      background: #243229;
+      cursor: pointer;
+      transition: background .15s, border-color .15s;
+    }
+    .icon-button { min-width: 36px; font: 16px var(--pixel-font); }
+    .text-button { padding: 0 12px; font-size: 11px; }
+    .icon-button:hover, .text-button:hover { border-color: var(--lime); background: #304132; }
+    .save-state { width: 8px; height: 8px; margin-right: 7px; display: inline-block; border-radius: 50%; background: var(--lime); }
+    .game-stage { position: relative; min-height: 0; padding: 16px 0 12px; }
+    .canvas-frame {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 240px;
+      overflow: hidden;
+      border: 2px solid #536447;
+      background: #91c9bc;
+      box-shadow: 6px 6px 0 #101812;
+      touch-action: none;
+    }
+    canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+    .world-label, .world-coords {
+      position: absolute;
+      top: 14px;
+      color: #183229;
+      font: bold 11px var(--pixel-font);
+      text-shadow: 1px 1px #d5efc7;
+      pointer-events: none;
+    }
+    .world-label { left: 16px; }
+    .world-coords { right: 16px; }
+    .hint {
+      position: absolute;
+      left: 50%;
+      bottom: 12px;
+      padding: 7px 10px;
+      color: #edf2d7;
+      background: #18231dcc;
+      border: 1px solid #60715a;
+      transform: translateX(-50%);
+      font: 10px var(--pixel-font);
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    .modal-layer {
+      position: absolute;
+      inset: 0;
+      display: none;
+      place-items: center;
+      background: #15201999;
+      z-index: 4;
+    }
+    .modal-layer.open { display: grid; }
+    .inventory-panel {
+      width: min(390px, calc(100% - 28px));
+      padding: 20px;
+      border: 2px solid #83916a;
+      background: #202c24;
+      box-shadow: 6px 6px 0 #111811;
+    }
+    .inventory-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .inventory-heading h2 { margin: 0; font: bold 16px var(--pixel-font); }
+    .inventory-heading span { color: var(--muted); font: 10px var(--pixel-font); }
+    .inventory-list { display: grid; gap: 7px; margin-bottom: 20px; }
+    .inventory-row { display: flex; justify-content: space-between; padding: 8px 10px; background: #29382c; font-size: 12px; }
+    .inventory-row span:last-child { color: var(--lime); font-family: var(--pixel-font); }
+    .craft-title { margin: 0 0 8px; color: var(--muted); font: 10px var(--pixel-font); text-transform: uppercase; }
+    .recipe { width: 100%; min-height: 38px; margin-top: 6px; padding: 7px 9px; display: flex; justify-content: space-between; text-align: left; border: 1px solid var(--line); background: #28372d; cursor: pointer; font-size: 11px; }
+    .recipe:hover:not(:disabled) { border-color: var(--lime); }
+    .recipe:disabled { opacity: .42; cursor: not-allowed; }
+    .recipe small { color: var(--muted); font: 10px var(--pixel-font); }
+    .bottom-bar { display: flex; align-items: center; justify-content: center; gap: 18px; border-top: 1px solid var(--line); }
+    .hotbar { display: flex; gap: 6px; }
+    .slot {
+      position: relative;
+      width: 62px;
+      height: 62px;
+      padding: 5px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      border: 1px solid #536447;
+      background: #202c24;
+      cursor: pointer;
+      font: 9px var(--pixel-font);
+      transition: border-color .12s, transform .12s;
+    }
+    .slot:hover { transform: translateY(-2px); }
+    .slot.selected { border: 2px solid var(--lime); background: #34422d; box-shadow: 0 0 0 2px #202c24, 0 0 0 3px #8fa05a; }
+    .slot-art { width: 19px; height: 19px; border: 2px solid #111a12; box-shadow: inset 3px 3px #ffffff30; image-rendering: pixelated; }
+    .slot-name { color: #d8dfc7; }
+    .slot-count { position: absolute; right: 5px; top: 4px; color: #fff; font: bold 11px var(--pixel-font); text-shadow: 1px 1px #111; }
+    .hotkey { position: absolute; left: 4px; top: 4px; color: #97a38b; font: 9px var(--pixel-font); }
+    .side-note { width: 140px; color: var(--muted); font: 9px/1.6 var(--pixel-font); }
+    .side-note b { color: var(--lime); font-weight: normal; }
+    .touch-controls { display: none; }
+    @media (max-width: 650px) {
+      .game-shell { grid-template-rows: 56px minmax(0, 1fr) 82px; padding: 0 10px; }
+      .topbar { gap: 7px; }
+      .brand { gap: 8px; }
+      .brand-title { font-size: 11px; }
+      .brand-subtitle { font-size: 8px; }
+      .brand-mark { width: 29px; height: 29px; }
+      .text-button { padding: 0 8px; font-size: 10px; }
+      .top-actions { gap: 5px; }
+      .game-stage { padding: 10px 0; }
+      .bottom-bar { gap: 0; justify-content: space-around; }
+      .slot { width: min(16vw, 58px); height: 58px; }
+      .side-note { display: none; }
+      .touch-controls { position: absolute; inset: auto 12px 12px; display: flex; justify-content: space-between; align-items: end; pointer-events: none; }
+      .touch-group { display: flex; gap: 7px; pointer-events: auto; }
+      .touch-button { width: 48px; height: 44px; border: 1px solid #aeb995; color: #eef4d8; background: #1b291ddd; font: bold 17px var(--pixel-font); touch-action: none; }
+      .touch-button:active { background: #708049; }
+      .hint { bottom: 65px; font-size: 8px; }
+      .world-label, .world-coords { top: 9px; font-size: 9px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="game-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">P</div>
+        <div><div class="brand-title">PAPER MINECRAFT</div><div class="brand-subtitle">a tiny block world</div></div>
+      </div>
+      <div class="top-actions">
+        <button class="text-button" id="saveButton" title="Save your world"><span class="save-state"></span><span id="saveLabel">SAVED</span></button>
+        <button class="icon-button" id="inventoryButton" title="Inventory and crafting (E)" aria-label="Open inventory">E</button>
+        <button class="icon-button" id="newWorldButton" title="Create a new world" aria-label="Create a new world">↻</button>
+      </div>
+    </header>
+    <section class="game-stage" aria-label="Game world">
+      <div class="canvas-frame" id="canvasFrame">
+        <canvas id="gameCanvas" aria-label="Paper Minecraft world"></canvas>
+        <div class="world-label">OVERGROWN MEADOW</div>
+        <div class="world-coords" id="coords">X 0 · DAY 1</div>
+        <div class="hint" id="hint">A / D MOVE · SPACE JUMP · CLICK MINE · RIGHT CLICK PLACE</div>
+        <div class="modal-layer" id="modalLayer">
+          <section class="inventory-panel" role="dialog" aria-modal="true" aria-labelledby="inventoryTitle">
+            <div class="inventory-heading"><h2 id="inventoryTitle">BACKPACK</h2><span>PRESS E TO CLOSE</span></div>
+            <div class="inventory-list" id="inventoryList"></div>
+            <p class="craft-title">Workbench · recipes</p>
+            <button class="recipe" data-recipe="planks"><span>4 wooden planks</span><small>1 log</small></button>
+            <button class="recipe" data-recipe="sticks"><span>4 sticks</span><small>2 planks</small></button>
+            <button class="recipe" data-recipe="pickaxe"><span>Stone pickaxe</span><small>3 stone + 2 sticks</small></button>
+          </section>
+        </div>
+        <div class="touch-controls" aria-label="Touch controls">
+          <div class="touch-group"><button class="touch-button" data-key="left" aria-label="Move left">←</button><button class="touch-button" data-key="right" aria-label="Move right">→</button></div>
+          <div class="touch-group"><button class="touch-button" data-action="mine" aria-label="Mine block">⛏</button><button class="touch-button" data-action="place" aria-label="Place block">＋</button><button class="touch-button" data-key="jump" aria-label="Jump">↑</button></div>
+        </div>
+      </div>
+    </section>
+    <footer class="bottom-bar">
+      <div class="side-note"><b>WASD</b> move &nbsp; <b>1–5</b> select<br><b>E</b> backpack &nbsp; <b>ESC</b> close</div>
+      <div class="hotbar" id="hotbar" aria-label="Hotbar"></div>
+      <div class="side-note">DIG A LITTLE.<br>BUILD A LOT.</div>
+    </footer>
+  </main>
+  <script>
+    (() => {
+      const canvas = document.querySelector("#gameCanvas");
+      const context = canvas.getContext("2d");
+      const frame = document.querySelector("#canvasFrame");
+      const modal = document.querySelector("#modalLayer");
+      const hotbarElement = document.querySelector("#hotbar");
+      const inventoryList = document.querySelector("#inventoryList");
+      const coords = document.querySelector("#coords");
+      const saveLabel = document.querySelector("#saveLabel");
+      const TILE = 32;
+      const WORLD_WIDTH = 180;
+      const WORLD_HEIGHT = 32;
+      const SLOT_ITEMS = ["dirt", "wood", "stone", "leaves", "plank"];
+      const BLOCKS = {
+        grass: { color: "#70a84e", top: "#a5cf67", name: "Grass" },
+        dirt: { color: "#986747", top: "#b67b50", name: "Dirt" },
+        stone: { color: "#788477", top: "#9ba294", name: "Stone" },
+        wood: { color: "#95683c", top: "#c08c4b", name: "Wood" },
+        leaves: { color: "#4e8d55", top: "#75ad5c", name: "Leaves" },
+        plank: { color: "#c39454", top: "#e0b874", name: "Planks" }
+      };
+      const ART = { dirt: "#986747", wood: "#95683c", stone: "#788477", leaves: "#4e8d55", plank: "#c39454" };
+      let world = [];
+      let heights = [];
+      let inventory = { dirt: 12, wood: 0, stone: 3, leaves: 0, plank: 0, sticks: 0 };
+      let hasPickaxe = false;
+      let selectedSlot = 0;
+      let camera = { x: 0, y: 0 };
+      let viewWidth = 0;
+      let viewHeight = 0;
+      let lastTime = 0;
+      let saveTimer = 0;
+      let autosaveClock = 0;
+      let dayTime = 0;
+      let miningClock = 0;
+      let activePointerAction = null;
+      let pointerWorld = null;
+      const keys = new Set();
+      const player = { x: 0, y: 0, width: 22, height: 39, vx: 0, vy: 0, grounded: false, facing: 1 };
+
+      function randomFrom(seed) {
+        let value = seed >>> 0;
+        return () => {
+          value = (value * 1664525 + 1013904223) >>> 0;
+          return value / 4294967296;
+        };
+      }
+
+      function generateWorld(seed = Math.floor(Math.random() * 999999)) {
+        const random = randomFrom(seed);
+        world = Array.from({ length: WORLD_HEIGHT }, () => Array(WORLD_WIDTH).fill(null));
+        heights = [];
+        let ground = 18;
+        for (let x = 0; x < WORLD_WIDTH; x++) {
+          if (x % 5 === 0) ground += Math.floor(random() * 3) - 1;
+          ground = Math.max(14, Math.min(21, ground));
+          heights[x] = ground;
+          for (let y = ground; y < WORLD_HEIGHT; y++) {
+            world[y][x] = y === ground ? "grass" : y < ground + 4 ? "dirt" : "stone";
+          }
+        }
+        for (let x = 4; x < WORLD_WIDTH - 4; x++) {
+          if ((x === 14 || (x >= 18 && random() > 0.91)) && Math.abs(heights[x] - heights[x - 1]) < 2) {
+            const base = heights[x];
+            const trunkHeight = 3 + Math.floor(random() * 2);
+            for (let y = base - trunkHeight; y < base; y++) world[y][x] = "wood";
+            for (let leafY = base - trunkHeight - 2; leafY <= base - trunkHeight + 1; leafY++) {
+              for (let leafX = x - 2; leafX <= x + 2; leafX++) {
+                if (leafY >= 0 && Math.abs(leafX - x) + Math.abs(leafY - (base - trunkHeight)) < 4 && !world[leafY][leafX]) world[leafY][leafX] = "leaves";
+              }
+            }
+          }
+        }
+        player.x = 8 * TILE;
+        player.y = (heights[8] - 2) * TILE - player.height;
+        player.vx = 0;
+        player.vy = 0;
+        dayTime = 0;
+        localStorage.setItem("paper-minecraft-seed", String(seed));
+        saveGame();
+      }
+
+      function saveGame() {
+        try {
+          localStorage.setItem("paper-minecraft-save", JSON.stringify({ world, heights, inventory, hasPickaxe, player: { x: player.x, y: player.y }, dayTime }));
+          saveLabel.textContent = "SAVED";
+        } catch { saveLabel.textContent = "NO SAVE"; }
+      }
+
+      function loadGame() {
+        try {
+          const saved = JSON.parse(localStorage.getItem("paper-minecraft-save"));
+          if (saved && Array.isArray(saved.world) && saved.world.length === WORLD_HEIGHT && saved.world[0].length === WORLD_WIDTH) {
+            world = saved.world;
+            heights = saved.heights;
+            inventory = { ...inventory, ...saved.inventory };
+            hasPickaxe = Boolean(saved.hasPickaxe);
+            if (!hasPickaxe && inventory.stone < 3) inventory.stone = 3;
+            player.x = saved.player.x;
+            player.y = saved.player.y;
+            if (collidesAt(player.x, player.y)) {
+              for (let x = 1; x < WORLD_WIDTH - 1; x++) {
+                const spawnY = heights[x] * TILE - player.height;
+                if (!collidesAt(x * TILE, spawnY)) {
+                  player.x = x * TILE;
+                  player.y = spawnY;
+                  player.vx = 0;
+                  player.vy = 0;
+                  break;
+                }
+              }
+            }
+            dayTime = saved.dayTime || 0;
+            return true;
+          }
+        } catch { localStorage.removeItem("paper-minecraft-save"); }
+        return false;
+      }
+
+      function resizeCanvas() {
+        const bounds = frame.getBoundingClientRect();
+        const ratio = Math.min(window.devicePixelRatio || 1, 2);
+        viewWidth = bounds.width;
+        viewHeight = bounds.height;
+        canvas.width = Math.round(viewWidth * ratio);
+        canvas.height = Math.round(viewHeight * ratio);
+        context.setTransform(ratio, 0, 0, ratio, 0, 0);
+        context.imageSmoothingEnabled = false;
+      }
+
+      function blockAt(tileX, tileY) {
+        if (tileX < 0 || tileX >= WORLD_WIDTH || tileY < 0 || tileY >= WORLD_HEIGHT) return "stone";
+        return world[tileY][tileX];
+      }
+
+      function collidesAt(x, y) {
+        const left = Math.floor(x / TILE);
+        const right = Math.floor((x + player.width - 1) / TILE);
+        const top = Math.floor(y / TILE);
+        const bottom = Math.floor((y + player.height - 1) / TILE);
+        for (let tileY = top; tileY <= bottom; tileY++) {
+          for (let tileX = left; tileX <= right; tileX++) if (blockAt(tileX, tileY)) return true;
+        }
+        return false;
+      }
+
+      function movePlayer(delta) {
+        const speed = 180;
+        const direction = (keys.has("right") || keys.has("d") || keys.has("arrowright") ? 1 : 0) - (keys.has("left") || keys.has("a") || keys.has("arrowleft") ? 1 : 0);
+        player.vx = direction * speed;
+        if (direction) player.facing = direction;
+        if ((keys.has(" ") || keys.has("w") || keys.has("arrowup") || keys.has("jump")) && player.grounded) {
+          player.vy = -425;
+          player.grounded = false;
+        }
+        player.vy = Math.min(player.vy + 1100 * delta, 650);
+        const nextX = player.x + player.vx * delta;
+        if (!collidesAt(nextX, player.y)) player.x = Math.max(0, Math.min(WORLD_WIDTH * TILE - player.width, nextX));
+        const nextY = player.y + player.vy * delta;
+        if (!collidesAt(player.x, nextY)) {
+          player.y = nextY;
+          player.grounded = false;
+        } else {
+          if (player.vy > 0) player.grounded = true;
+          player.vy = 0;
+        }
+        if (player.y > WORLD_HEIGHT * TILE) {
+          player.x = 8 * TILE;
+          player.y = (heights[8] - 2) * TILE - player.height;
+          player.vy = 0;
+        }
+      }
+
+      function targetTile(event) {
+        const bounds = canvas.getBoundingClientRect();
+        const worldX = event ? event.clientX - bounds.left + camera.x : pointerWorld?.x;
+        const worldY = event ? event.clientY - bounds.top + camera.y : pointerWorld?.y;
+        if (worldX == null || worldY == null) return null;
+        return { x: Math.floor(worldX / TILE), y: Math.floor(worldY / TILE), worldX, worldY };
+      }
+
+      function setFrontTarget() {
+        const x = Math.floor((player.x + player.width / 2 + player.facing * TILE) / TILE);
+        const y = Math.floor((player.y + player.height / 2) / TILE);
+        pointerWorld = { x: (x + .5) * TILE, y: (y + .5) * TILE };
+      }
+
+      function inReach(target) {
+        const playerCenterX = player.x + player.width / 2;
+        const playerCenterY = player.y + player.height / 2;
+        return Math.hypot((target.x * TILE + TILE / 2) - playerCenterX, (target.y * TILE + TILE / 2) - playerCenterY) <= TILE * 5;
+      }
+
+      function mineBlock(target) {
+        if (!target || !inReach(target) || target.x < 0 || target.x >= WORLD_WIDTH || target.y < 0 || target.y >= WORLD_HEIGHT) return;
+        const block = world[target.y][target.x];
+        if (!block) return;
+        if (block === "stone" && !hasPickaxe) {
+          showHint("CRAFT A STONE PICKAXE TO MINE STONE");
+          return;
+        }
+        world[target.y][target.x] = null;
+        const loot = block === "grass" ? "dirt" : block;
+        inventory[loot] = (inventory[loot] || 0) + 1;
+        renderInventory();
+      }
+
+      function placeBlock(target) {
+        const item = SLOT_ITEMS[selectedSlot];
+        if (!target || !inReach(target) || target.x < 0 || target.x >= WORLD_WIDTH || target.y < 0 || target.y >= WORLD_HEIGHT || world[target.y][target.x] || inventory[item] < 1) return;
+        world[target.y][target.x] = item;
+        if (collidesAt(player.x, player.y)) {
+          world[target.y][target.x] = null;
+          return;
+        }
+        inventory[item]--;
+        renderInventory();
+      }
+
+      function showHint(message) {
+        const hint = document.querySelector("#hint");
+        hint.textContent = message;
+        clearTimeout(showHint.timer);
+        showHint.timer = setTimeout(() => { hint.textContent = "A / D MOVE · SPACE JUMP · CLICK MINE · RIGHT CLICK PLACE"; }, 1400);
+      }
+
+      function renderBlock(x, y, block) {
+        const px = x * TILE - camera.x;
+        const py = y * TILE - camera.y;
+        const color = BLOCKS[block];
+        context.fillStyle = color.color;
+        context.fillRect(px, py, TILE, TILE);
+        context.fillStyle = color.top;
+        context.fillRect(px, py, TILE, 5);
+        context.fillStyle = "#1721191a";
+        context.fillRect(px + TILE - 4, py + 4, 4, TILE - 4);
+        context.fillRect(px + 3, py + TILE - 4, TILE - 7, 4);
+        context.fillStyle = "#ffffff12";
+        context.fillRect(px + 5, py + 9, 6, 3);
+        if (block === "wood") {
+          context.fillStyle = "#654329";
+          context.fillRect(px + 8, py + 4, 3, TILE - 4);
+          context.fillRect(px + 21, py + 4, 2, TILE - 4);
+        } else if (block === "leaves") {
+          context.fillStyle = "#b2d26b55";
+          context.fillRect(px + 5, py + 9, 5, 5);
+          context.fillRect(px + 19, py + 19, 6, 5);
+        } else if (block === "stone") {
+          context.fillStyle = "#ffffff28";
+          context.fillRect(px + 7, py + 12, 8, 3);
+          context.fillRect(px + 19, py + 23, 6, 3);
+        } else if (block === "plank") {
+          context.fillStyle = "#78553955";
+          context.fillRect(px + 4, py + 10, TILE - 8, 2);
+          context.fillRect(px + 4, py + 22, TILE - 8, 2);
+        }
+      }
+
+      function drawBackground() {
+        const daylight = (Math.sin(dayTime * 0.12 - 1.1) + 1) / 2;
+        const topColor = daylight > .35 ? "#9bcdbd" : "#263b4b";
+        const bottomColor = daylight > .35 ? "#d2d49a" : "#596b75";
+        const gradient = context.createLinearGradient(0, 0, 0, viewHeight);
+        gradient.addColorStop(0, topColor);
+        gradient.addColorStop(1, bottomColor);
+        context.fillStyle = gradient;
+        context.fillRect(0, 0, viewWidth, viewHeight);
+        context.fillStyle = daylight > .35 ? "#f3d982" : "#e3ebd0";
+        context.beginPath();
+        context.arc(viewWidth * .78 - (dayTime % 1) * 55, viewHeight * .2, 20, 0, Math.PI * 2);
+        context.fill();
+        context.fillStyle = daylight > .35 ? "#769b80" : "#344b5a";
+        for (let ridge = 0; ridge < 2; ridge++) {
+          context.beginPath();
+          context.moveTo(0, viewHeight * (.68 + ridge * .09));
+          for (let x = 0; x <= viewWidth + 40; x += 40) {
+            const y = viewHeight * (.58 + ridge * .09) + Math.sin((x + camera.x * .12) * .008 + ridge * 2) * 25;
+            context.lineTo(x, y);
+          }
+          context.lineTo(viewWidth, viewHeight);
+          context.lineTo(0, viewHeight);
+          context.closePath();
+          context.globalAlpha = ridge === 0 ? .38 : .55;
+          context.fill();
+          context.globalAlpha = 1;
+        }
+        context.fillStyle = "#f3f4dc";
+        for (let i = 0; i < 24; i++) {
+          const starX = (i * 127 + 31) % Math.max(1, viewWidth);
+          const starY = (i * 53 + 18) % Math.max(1, viewHeight * .48);
+          context.globalAlpha = daylight > .35 ? 0 : .7;
+          context.fillRect(starX, starY, 2, 2);
+        }
+        context.globalAlpha = 1;
+      }
+
+      function drawPlayer() {
+        const x = Math.round(player.x - camera.x);
+        const y = Math.round(player.y - camera.y);
+        context.fillStyle = "#26352b";
+        context.fillRect(x + 2, y + 4, 18, 14);
+        context.fillStyle = "#edbd8e";
+        context.fillRect(x + 4, y + 7, 14, 11);
+        context.fillStyle = "#e3a778";
+        context.fillRect(x + 3, y + 4, 16, 5);
+        context.fillStyle = "#f1e7c7";
+        context.fillRect(x + 5, y + 20, 13, 10);
+        context.fillStyle = "#d27a55";
+        context.fillRect(x + 4, y + 30, 7, 9);
+        context.fillRect(x + 13, y + 30, 7, 9);
+        context.fillStyle = "#24372e";
+        const eyeX = player.facing > 0 ? x + 14 : x + 7;
+        context.fillRect(eyeX, y + 10, 2, 2);
+        context.fillRect(x + (player.facing > 0 ? 13 : 5), y + 22, 3, 5);
+      }
+
+      function drawTarget() {
+        const target = targetTile();
+        if (!target || !inReach(target) || !blockAt(target.x, target.y)) return;
+        context.strokeStyle = "#f5efc6";
+        context.lineWidth = 2;
+        context.strokeRect(target.x * TILE - camera.x + 2, target.y * TILE - camera.y + 2, TILE - 4, TILE - 4);
+      }
+
+      function render() {
+        context.clearRect(0, 0, viewWidth, viewHeight);
+        drawBackground();
+        const firstX = Math.max(0, Math.floor(camera.x / TILE));
+        const lastX = Math.min(WORLD_WIDTH - 1, Math.ceil((camera.x + viewWidth) / TILE));
+        const firstY = Math.max(0, Math.floor(camera.y / TILE));
+        const lastY = Math.min(WORLD_HEIGHT - 1, Math.ceil((camera.y + viewHeight) / TILE));
+        for (let y = firstY; y <= lastY; y++) {
+          for (let x = firstX; x <= lastX; x++) if (world[y][x]) renderBlock(x, y, world[y][x]);
+        }
+        drawTarget();
+        drawPlayer();
+      }
+
+      function updateHud() {
+        coords.textContent = `X ${Math.floor(player.x / TILE)} · DAY ${Math.floor(dayTime / 12) + 1}`;
+        const targetX = Math.max(0, Math.min(WORLD_WIDTH * TILE - viewWidth, player.x + player.width / 2 - viewWidth / 2));
+        const targetY = Math.max(0, Math.min(WORLD_HEIGHT * TILE - viewHeight, player.y + player.height / 2 - viewHeight * .55));
+        camera.x += (targetX - camera.x) * .12;
+        camera.y += (targetY - camera.y) * .12;
+      }
+
+      function gameLoop(timestamp) {
+        const delta = Math.min((timestamp - lastTime) / 1000 || 0, .04);
+        lastTime = timestamp;
+        if (!modal.classList.contains("open")) {
+          movePlayer(delta);
+          dayTime += delta;
+          miningClock += delta;
+          if (activePointerAction && miningClock > .16) {
+            miningClock = 0;
+            const target = targetTile();
+            if (activePointerAction === "mine") mineBlock(target);
+            else placeBlock(target);
+          }
+          if (saveTimer > 0) {
+            saveTimer -= delta;
+            if (saveTimer <= 0) saveGame();
+          }
+          autosaveClock += delta;
+          if (autosaveClock >= 5) {
+            autosaveClock = 0;
+            saveGame();
+          }
+        }
+        updateHud();
+        render();
+        requestAnimationFrame(gameLoop);
+      }
+
+      function markDirty() {
+        saveLabel.textContent = "UNSAVED";
+        saveTimer = 1;
+      }
+
+      function renderHotbar() {
+        hotbarElement.innerHTML = "";
+        SLOT_ITEMS.forEach((item, index) => {
+          const button = document.createElement("button");
+          button.className = `slot${selectedSlot === index ? " selected" : ""}`;
+          button.title = `${index + 1}: ${BLOCKS[item].name} (${inventory[item] || 0})`;
+          button.setAttribute("aria-label", button.title);
+          button.innerHTML = `<span class="hotkey">${index + 1}</span><span class="slot-art" style="background:${ART[item]}"></span><span class="slot-name">${item.toUpperCase()}</span><span class="slot-count">${inventory[item] || 0}</span>`;
+          button.addEventListener("click", () => { selectedSlot = index; renderHotbar(); });
+          hotbarElement.append(button);
+        });
+      }
+
+      function renderInventory() {
+        inventoryList.innerHTML = "";
+        const entries = [...SLOT_ITEMS.map(item => [BLOCKS[item].name, inventory[item] || 0]), ["Sticks", inventory.sticks || 0], ["Stone pickaxe", hasPickaxe ? 1 : 0]];
+        for (const [name, count] of entries) {
+          const row = document.createElement("div");
+          row.className = "inventory-row";
+          row.innerHTML = `<span>${name}</span><span>${count}</span>`;
+          inventoryList.append(row);
+        }
+        document.querySelector('[data-recipe="planks"]').disabled = inventory.wood < 1;
+        document.querySelector('[data-recipe="sticks"]').disabled = inventory.plank < 2;
+        document.querySelector('[data-recipe="pickaxe"]').disabled = hasPickaxe || inventory.stone < 3 || inventory.sticks < 2;
+        renderHotbar();
+      }
+
+      function craft(recipe) {
+        if (recipe === "planks" && inventory.wood >= 1) {
+          inventory.wood--;
+          inventory.plank += 4;
+        } else if (recipe === "sticks" && inventory.plank >= 2) {
+          inventory.plank -= 2;
+          inventory.sticks += 4;
+        } else if (recipe === "pickaxe" && !hasPickaxe && inventory.stone >= 3 && inventory.sticks >= 2) {
+          inventory.stone -= 3;
+          inventory.sticks -= 2;
+          hasPickaxe = true;
+        }
+        renderInventory();
+        markDirty();
+      }
+
+      document.querySelectorAll(".recipe").forEach(button => button.addEventListener("click", () => craft(button.dataset.recipe)));
+      document.querySelector("#inventoryButton").addEventListener("click", () => {
+        modal.classList.toggle("open");
+        renderInventory();
+      });
+      document.querySelector("#saveButton").addEventListener("click", saveGame);
+      document.querySelector("#newWorldButton").addEventListener("click", () => {
+        if (confirm("Start a new world? This replaces your saved world.")) {
+          localStorage.removeItem("paper-minecraft-save");
+          inventory = { dirt: 12, wood: 0, stone: 3, leaves: 0, plank: 0, sticks: 0 };
+          hasPickaxe = false;
+          generateWorld();
+          renderInventory();
+        }
+      });
+      document.addEventListener("keydown", event => {
+        const key = event.key.toLowerCase();
+        if ([" ", "arrowleft", "arrowright", "arrowup"].includes(key)) event.preventDefault();
+        if (key === "e" || key === "escape") modal.classList.toggle("open", key === "e" ? !modal.classList.contains("open") : false);
+        if (key >= "1" && key <= "5") { selectedSlot = Number(key) - 1; renderHotbar(); }
+        keys.add(key);
+      });
+      document.addEventListener("keyup", event => keys.delete(event.key.toLowerCase()));
+      window.addEventListener("blur", () => keys.clear());
+      canvas.addEventListener("contextmenu", event => event.preventDefault());
+      canvas.addEventListener("pointermove", event => { pointerWorld = { x: event.clientX - canvas.getBoundingClientRect().left + camera.x, y: event.clientY - canvas.getBoundingClientRect().top + camera.y }; });
+      canvas.addEventListener("pointerdown", event => {
+        canvas.setPointerCapture(event.pointerId);
+        pointerWorld = { x: event.clientX - canvas.getBoundingClientRect().left + camera.x, y: event.clientY - canvas.getBoundingClientRect().top + camera.y };
+        activePointerAction = event.button === 2 ? "place" : "mine";
+        const target = targetTile();
+        if (activePointerAction === "place") placeBlock(target);
+        else mineBlock(target);
+        markDirty();
+      });
+      canvas.addEventListener("pointerup", () => { activePointerAction = null; markDirty(); });
+      canvas.addEventListener("pointercancel", () => { activePointerAction = null; });
+      document.querySelectorAll(".touch-button").forEach(button => {
+        const key = button.dataset.key;
+        const action = button.dataset.action;
+        button.addEventListener("pointerdown", event => {
+          event.preventDefault();
+          button.setPointerCapture(event.pointerId);
+          if (key === "jump") keys.add("jump");
+          else if (key) keys.add(key);
+          if (action) { setFrontTarget(); activePointerAction = action; miningClock = 1; }
+        });
+        const release = () => { if (key) keys.delete(key); if (action) activePointerAction = null; };
+        button.addEventListener("pointerup", release);
+        button.addEventListener("pointercancel", release);
+      });
+      window.addEventListener("resize", resizeCanvas);
+      window.addEventListener("beforeunload", saveGame);
+
+      if (!loadGame()) generateWorld(Number(localStorage.getItem("paper-minecraft-seed")) || undefined);
+      resizeCanvas();
+      renderInventory();
+      requestAnimationFrame(gameLoop);
+    })();
+  </script>
+</body>
+</html>
